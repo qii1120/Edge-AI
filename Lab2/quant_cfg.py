@@ -38,25 +38,57 @@ from hqq.core.quantize import BaseQuantizeConfig
 def get_quant_config_deit(model):
     quant_config = {}
 
-    q4_attn = BaseQuantizeConfig(nbits=4, group_size=32)   # Attention safer
-    q4_proj = BaseQuantizeConfig(nbits=4, group_size=32)
-    q3_mlp = BaseQuantizeConfig(nbits=3, group_size=32)
-    q4_patch = BaseQuantizeConfig(nbits=4, group_size=32)  # 小心不能再用 64，精度會低
-
-    # 改回 3-bit patch，提升精度
-    # q3_patch = BaseQuantizeConfig(nbits=3, group_size=64)
+    q4_64 = BaseQuantizeConfig(nbits=4, group_size=64)
+    q4_32 = BaseQuantizeConfig(nbits=4, group_size=32)   # Attention safer
 
     n_blocks = len(model.blocks)
 
     for i in range(n_blocks):
-        quant_config[f'blocks.{i}.attn.qkv'] = q4_attn
-        quant_config[f'blocks.{i}.attn.proj'] = q4_proj
-        quant_config[f'blocks.{i}.mlp.fc1'] = q4_proj   # ⚠️ 改為 4-bit 回補 MLP 精度
-        quant_config[f'blocks.{i}.mlp.fc2'] = q4_proj
-
-    quant_config['patch_embed.proj'] = q4_patch  # ⚠️ 由 4/64 改成 4/32，提升精度但保壓縮
+        if i < (n_blocks/3+1):
+            quant_config[f'blocks.{i}.attn.qkv'] = q4_32
+            quant_config[f'blocks.{i}.attn.proj'] = q4_32
+            quant_config[f'blocks.{i}.mlp.fc1'] = q4_32
+            quant_config[f'blocks.{i}.mlp.fc2'] = q4_32
+        else:
+            quant_config[f'blocks.{i}.attn.qkv'] = q4_64
+            quant_config[f'blocks.{i}.attn.proj'] = q4_64
+            quant_config[f'blocks.{i}.mlp.fc1'] = q4_64
+            quant_config[f'blocks.{i}.mlp.fc2'] = q4_64
 
     return quant_config
+
+# def get_quant_config_deit(model):
+#     quant_config = {}
+
+#     q5 = BaseQuantizeConfig(nbits=5, group_size=32)
+#     q4 = BaseQuantizeConfig(nbits=4, group_size=16)
+#     q3 = BaseQuantizeConfig(nbits=3, group_size=16)
+#     q2 = BaseQuantizeConfig(nbits=2, group_size=16)
+#     q4_patch = BaseQuantizeConfig(nbits=4, group_size=32)
+
+#     n_blocks = len(model.blocks)
+
+#     for i in range(n_blocks):
+#         if i < 4:  # 前段：高精度
+#             quant_config[f'blocks.{i}.attn.qkv'] = q5
+#             quant_config[f'blocks.{i}.attn.proj'] = q5
+#             quant_config[f'blocks.{i}.mlp.fc1'] = q5
+#             quant_config[f'blocks.{i}.mlp.fc2'] = q5
+#         elif i < 8:  # 中段：中精度
+#             quant_config[f'blocks.{i}.attn.qkv'] = q4
+#             quant_config[f'blocks.{i}.attn.proj'] = q4
+#             quant_config[f'blocks.{i}.mlp.fc1'] = q4
+#             quant_config[f'blocks.{i}.mlp.fc2'] = q4
+#         else:  # 後段：壓縮精度
+#             quant_config[f'blocks.{i}.attn.qkv'] = q3
+#             quant_config[f'blocks.{i}.attn.proj'] = q3
+#             quant_config[f'blocks.{i}.mlp.fc1'] = q3
+#             quant_config[f'blocks.{i}.mlp.fc2'] = q2  # 精簡 fc2 精度空間
+
+#     # 加上 patch embedding 量化（若之前沒使用）
+#     quant_config['patch_embed.proj'] = q4_patch
+
+#     return quant_config
 
 
 
